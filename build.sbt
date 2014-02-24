@@ -22,3 +22,6 @@ libraryDependencies += "io.spray" % "spray-routing" % "1.2.0"
 
 libraryDependencies += "io.spray" % "spray-can" % "1.2.0"
 
+libraryDependencies += "io.spray" % "spray-testkit" % "1.2.0" % "test"
+
+

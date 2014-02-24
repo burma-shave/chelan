@@ -1,48 +1,22 @@
 package ericj.chelan
 
-import spray.routing.SimpleRoutingApp
-import akka.actor._
-import akka.pattern.ask
-import KeyImplicits._
-import scala.concurrent.duration._
-import akka.util.Timeout
-import scala.util.Try
-import scala.concurrent.Future
+import akka.actor.{ActorSystem, Props}
+import akka.io.IO
+import spray.can.Http
 
 
 /**
  * Created by ericj on 13/02/2014.
  */
-object Server extends App with SimpleRoutingApp {
+object Server extends App {
 
-  implicit val system = ActorSystem()
-  implicit val timeout: Timeout = 1 second
-  import system._
+  // we need an ActorSystem to host our application in
+  implicit val system = ActorSystem("on-spray-can")
 
-  private val kvs: ActorRef = system.actorOf(Props[Kvs])
+  // create and start our service actor
+  val service = system.actorOf(Props[KvsServiceActor], "demo-service")
 
-  startServer(interface = "localhost", port = 9000) {
-    path(""".+""".r) { key =>
-      get {
-        complete {
-          ask(kvs, Get(key)).mapTo[Option[String]]
-        }
-      } ~
-      put {
-        entity(as[String]) { value =>
-          complete {
-            kvs ! Put(key, value)
-            key
-          }
-        }
-      } ~
-      delete {
-        complete {
-          kvs ! Remove(key)
-          "ok"
-        }
-      }
-    }
-  }
+  // start a new HTTP server on port 8080 with our service actor as the handler
+  IO(Http) ! Http.Bind(service, "localhost", port = 8080)
 
 }

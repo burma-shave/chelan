@@ -4,10 +4,6 @@ import akka.actor.{ActorLogging, Actor}
 import scala.collection.mutable
 import com.roundeights.hasher.{Hash, Digest}
 
-/**
- * Created by ericj on 13/02/2014.
- */
-
 case class Put(val key: Hash, val value: String)
 
 case class Get(val key: Hash)
