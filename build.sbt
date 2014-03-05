@@ -10,9 +10,11 @@ resolvers += "RoundEights" at "http://maven.spikemark.net/roundeights"
 
 resolvers += "spray repo" at "http://repo.spray.io"
 
-libraryDependencies += "com.typesafe.akka" %% "akka-actor" % "2.2.3"
+libraryDependencies += "com.typesafe.akka" %% "akka-actor" % "2.3.0"
 
-libraryDependencies += "com.typesafe.akka" %% "akka-testkit" % "2.2.3" % "test"
+libraryDependencies += "com.typesafe.akka" %% "akka-persistence-experimental" % "2.3.0"
+
+libraryDependencies += "com.typesafe.akka" %% "akka-testkit" % "2.3.0" % "test"
 
 libraryDependencies += "org.scalatest" % "scalatest_2.10" % "2.0" % "test"
 

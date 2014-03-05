@@ -1,8 +1,8 @@
-package ericj.chelan
+package ericj.chelan.kvs
 
-import akka.actor.{ActorLogging, Actor}
+import akka.actor.Actor
 import scala.collection.mutable
-import com.roundeights.hasher.{Hash, Digest}
+import com.roundeights.hasher.Hash
 
 case class Put(val key: Hash, val value: String)
 

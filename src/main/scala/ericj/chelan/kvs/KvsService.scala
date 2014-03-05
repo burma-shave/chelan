@@ -1,9 +1,8 @@
-package ericj.chelan
+package ericj.chelan.kvs
 
 import spray.routing.HttpService
 import akka.pattern.ask
 import akka.actor.{Actor, Props, ActorRef}
-import KeyImplicits._
 import akka.util.Timeout
 import scala.concurrent.duration._
 
@@ -17,6 +16,8 @@ class KvsServiceActor extends Actor with KvsService {
 }
 
 trait KvsService extends HttpService {
+
+  import KeyImplicits._
 
   implicit def executionContext = actorRefFactory.dispatcher
   private val kvs: ActorRef = actorRefFactory.actorOf(Props[Kvs])

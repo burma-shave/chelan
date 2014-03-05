@@ -1,13 +1,9 @@
-package ericj.chelan
+package ericj.chelan.kvs
 
-import akka.testkit.{DefaultTimeout, TestKitBase, TestKit, TestActorRef}
+import akka.testkit.TestActorRef
 import akka.pattern.ask
-import scala.concurrent.Future
-import scala.concurrent.Await
-import scala.concurrent.duration._
-import akka.actor.ActorSystem
-import org.scalatest._
 import scala.util.Success
+import ericj.chelan.UnitSpec
 
 
 /**

@@ -3,6 +3,7 @@ package ericj.chelan
 import akka.actor.{ActorSystem, Props}
 import akka.io.IO
 import spray.can.Http
+import ericj.chelan.kvs.KvsServiceActor
 
 
 /**

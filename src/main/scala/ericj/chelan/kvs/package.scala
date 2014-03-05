@@ -1,4 +1,4 @@
-package ericj.chelan
+package ericj.chelan.kvs
 
 import com.roundeights.hasher.Implicits._
 
