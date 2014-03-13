@@ -2,44 +2,46 @@ package ericj.chelan.raft
 
 import ericj.chelan.UnitSpec
 import akka.actor.{ActorRef, Props}
-import ericj.chelan.raft.messages.{NewLeader, Init}
+import ericj.chelan.raft.messages.Init
 import akka.actor.ActorDSL._
-import scala.concurrent.duration._
+import akka.actor.FSM.{Transition, SubscribeTransitionCallBack}
 
 
 /**
- * Created by ericj on 04/03/2014.
+ * Created by Eric Jutrzenka on 04/03/2014.
  */
 class LeaderElectionSpec extends UnitSpec {
 
   "Raft" should "elect a leader" in {
+    val raftActor1 = system.actorOf(Props[RaftActor], "r1")
+    val raftActor2 = system.actorOf(Props[RaftActor], "r2")
+    val raftActor3 = system.actorOf(Props[RaftActor], "r3")
+    val raftActor4 = system.actorOf(Props[RaftActor], "r4")
+    val raftActor5 = system.actorOf(Props[RaftActor], "r5")
 
-    val parent = actor(new Act {
+    val raftActorRefs: Array[ActorRef] = Array(raftActor1, raftActor2, raftActor3, raftActor4, raftActor5)
 
-      val raftActor1 = context.actorOf(Props[RaftActor], "r1")
-      val raftActor2 = context.actorOf(Props[RaftActor], "r2")
-      val raftActor3 = context.actorOf(Props[RaftActor], "r3")
-      val raftActor4 = context.actorOf(Props[RaftActor], "r4")
-      val raftActor5 = context.actorOf(Props[RaftActor], "r5")
+    raftActorRefs foreach {
+      _ ! SubscribeTransitionCallBack(testActor)
+    }
 
-      val raftActorRefs: Array[ActorRef] = Array(raftActor1, raftActor2, raftActor3, raftActor4, raftActor5)
+    raftActorRefs foreach {
+      ref =>
+        ref ! Init(raftActorRefs filter (_ != ref))
+    }
 
-      val processorRefs = raftActorRefs.map {
-        ref => (context.actorOf(RaftProcessor.props(0, ref), s"p:${ref.path.name}"), ref)
-      }
+    fishForMessage(){
+      case Transition(_, Candidate, Leader) =>
+        true
+      case _ => false
+    }
 
-      raftActorRefs foreach {
-        raftRef => raftRef ! Init(processorRefs filter {
-          pair => pair._2 != raftRef
-        }map { _._1 })
-      }
+    raftActorRefs foreach {
+      ref =>
+        system.stop(ref)
+    }
+    system.shutdown()
 
-      become {
-        case m: NewLeader => testActor forward m
-      }
-    })
-
-    expectMsgType[NewLeader](10 seconds)
   }
 
 }

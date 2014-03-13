@@ -2,24 +2,16 @@ package ericj.chelan.raft.messages
 
 import akka.actor.ActorRef
 
-sealed trait RaftMessage{  val term: Int }
-
 case class Init(cluster: Array[ActorRef])
+object HeartBeat
+object ElectionTimeout
 
-case class AppendEntriesRpc(term: Int) extends RaftMessage
+sealed trait RaftMessage{  val term: Int }
+sealed trait RaftRequest extends RaftMessage
+sealed trait RaftResponse extends RaftMessage
 
-case class AppendEntriesRpcResponse(term: Int, success: Boolean) extends RaftMessage
+case class AppendEntriesRequest(term: Int) extends RaftRequest
+case class AppendEntriesResponse(term: Int, success: Boolean) extends RaftResponse
+case class RequestVoteRequest(term: Int) extends RaftRequest
+case class RequestVoteResponse(term: Int, granted: Boolean) extends RaftResponse
 
-case class VoteRequest(term: Int) extends RaftMessage
-
-case class Vote(term: Int, granted: Boolean) extends RaftResponse
-
-case class UpdateTerm(newTerm: Int)
-
-sealed trait RaftResponse { val term: Int }
-
-case class AppendRequestResponse(term: Int) extends RaftResponse
-
-sealed trait MonitoringMessage
-
-case class NewLeader(term: Int) extends MonitoringMessage

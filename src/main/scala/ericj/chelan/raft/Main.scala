@@ -2,9 +2,10 @@ package ericj.chelan.raft
 
 import akka.actor.{ActorRef, Props, ActorSystem}
 import ericj.chelan.raft.messages.Init
+import akka.actor.FSM.SubscribeTransitionCallBack
 
 /**
- * Created by ericj on 05/03/2014.
+ * Created by Eric Jutrzenka on 05/03/2014.
  */
 object Main {
 
@@ -19,16 +20,10 @@ object Main {
 
     val raftActorRefs: Array[ActorRef] = Array(raftActor1, raftActor2, raftActor3, raftActor4, raftActor5)
 
-    val processorRefs = raftActorRefs.map {
-      ref => system.actorOf(RaftProcessor.props(0, ref), s"p:${ref.path.name}")
+    raftActorRefs foreach {
+      ref =>
+        ref ! Init(raftActorRefs filter (_ != ref))
     }
-
-    processorRefs foreach {
-      ref => ref ! Init(processorRefs filter {
-        _ != ref
-      })
-    }
-
 
 
   }

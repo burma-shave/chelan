@@ -1,13 +1,15 @@
 package ericj.chelan.raft
 
-import akka.actor.{Actor, LoggingFSM, ActorRef, FSM}
+import akka.actor.{FSM, Actor, LoggingFSM, ActorRef}
 import ericj.chelan.raft.messages._
 import scala.concurrent.duration._
 
 /**
- * Created by ericj on 03/03/2014.
+ * Created by Eric Jutrzenka on 03/03/2014.
  */
-class RaftActor extends Actor with LoggingFSM[State, AllData] {
+class RaftActor extends Actor
+with LoggingFSM[State, AllData]
+with RaftBehaviour {
 
   val initialState = AllData(ReplicaVars(0, None), null)
 
@@ -15,72 +17,80 @@ class RaftActor extends Actor with LoggingFSM[State, AllData] {
 
   when(NotStarted) {
     case Event(Init(members), s) =>
-      goto(Follower) using s.copy(elector =
-        context.actorOf(ElectionActor.props(members), "delegate"))
+      goto(Follower) using s.copy(
+        electorate = members)
   }
 
   when(Follower, stateTimeout = electionTimeout()) {
-    case Event(StateTimeout, s: AllData) =>
-      goto(Candidate) using s.newTerm()
-    case Event(VoteRequest(term), s: AllData) =>
-      if (term < s.currentTerm || s.voted) {
-        sender ! Vote(s.currentTerm, false)
-        stay
-      } else {
-        sender ! Vote(s.currentTerm, true)
-        stay using s.votedFor(sender)
-      }
-    case Event(AppendEntriesRpc(term), s) =>
-      stay using s
+    startNewTerm orElse
+      raftReceive
   }
 
-  when(Candidate, stateTimeout = electionTimeout()) {
-    case Event(StateTimeout, s: AllData) => stay using s.newTerm
-    case Event(Elected, s) => goto(Leader) using s
-    case Event(UpdateTerm(newTerm), s: AllData) if newTerm >= s.currentTerm =>
-      goto(Follower) using s.copy(replicaVars = ReplicaVars(newTerm, None))
+  when(Candidate) {
+    transform {
+      standDown orElse
+        startNewTerm orElse
+        requestVote orElse
+        raftReceive
+    } using {
+      case a@FSM.State(state, s: AllData, timeout, stopReason, replies) if (s.enoughVotes()) =>
+        goto(Leader)
+    }
   }
 
-  when(Leader)(FSM.NullFunction)
-
-  whenUnhandled {
-    case Event(UpdateTerm(newTerm), s: AllData) if (newTerm > s.currentTerm) =>
-      goto(Follower) using s.copy(replicaVars = ReplicaVars(newTerm, None))
-    case Event(UpdateTerm(newTerm), s: AllData) if (newTerm == s.currentTerm) =>
-      stay
-    case Event(VoteRequest(_), s) =>
-      stay replying(Vote(s.replicaVars.currentTerm, false))
-    case Event(Elected, s) =>
-      stay
+  when(Leader) {
+    raftReceive orElse
+      appendEntries
   }
 
   onTransition {
-    case _ -> Candidate =>
-      nextStateData.elector ! NewElection(nextStateData.replicaVars.currentTerm)
-    case _ -> Leader =>
-      log.info(s"Elected as leader in term: ${nextStateData.currentTerm}")
-      nextStateData.elector ! AppendEntriesRpc(nextStateData.currentTerm)
-      context.parent ! NewLeader(nextStateData.currentTerm)
+    case Follower -> Candidate =>
+      setTimer("heartBeat", HeartBeat, 100 milliseconds, repeat = true)
+      setTimer("electionTimeout", ElectionTimeout, electionTimeout(), repeat = true)
+    case Candidate -> Follower =>
+      cancelTimer("heartBeat")
+      cancelTimer("electionTimeout")
+    case Candidate -> Leader =>
+      cancelTimer("electionTimeout")
+    case Leader -> Follower =>
+      cancelTimer("heartBeat")
   }
 
-  def electionTimeout(): FiniteDuration = (Math.random() * 150 milliseconds) + (150 milliseconds)
+  whenUnhandled {
+    case Event(HeartBeat, s) => stay()
+  }
 
 }
 
 sealed trait Data
 
-case class AllData(replicaVars: ReplicaVars, elector: ActorRef) extends Data {
+case class AllData(replicaVars: ReplicaVars, electorate: Array[ActorRef], ballots: List[Ballot] = List.empty)
+  extends Data {
   def newTerm(newTerm: Int): AllData = {
-    assert(newTerm > replicaVars.currentTerm)
-    copy(replicaVars = ReplicaVars(newTerm, None))
+    assert(newTerm >= replicaVars.currentTerm)
+    copy(replicaVars = ReplicaVars(newTerm, None), ballots = List.empty)
   }
 
   def newTerm(): AllData = newTerm(replicaVars.currentTerm + 1)
 
   def votedFor(candidate: ActorRef) = copy(replicaVars = replicaVars.copy(votedFor = Some(candidate)))
+
   def voted: Boolean = replicaVars.votedFor != None
+
   def currentTerm = replicaVars.currentTerm
+
+  def enoughVotes(): Boolean = {
+    ballots.count(b => b.granted) >= electorate.length / 2
+  }
+
+  def countBallot(ballot: Ballot) =
+    if (!counted(ballot.elector)) copy(ballots = ballots.+:(ballot))
+    else this
+
+  def counted(elector: ActorRef) = ballots.filter(b => b.elector == elector).nonEmpty
 }
+
+case class Ballot(elector: ActorRef, granted: Boolean)
 
 case class ReplicaVars(currentTerm: Int, votedFor: Option[ActorRef])
 
