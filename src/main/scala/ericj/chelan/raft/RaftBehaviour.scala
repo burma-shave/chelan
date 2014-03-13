@@ -15,15 +15,14 @@ import ericj.chelan.raft.messages.RequestVoteRequest
 trait RaftBehaviour extends FSM[State, AllData] {
 
   def raftReceive: StateFunction =
-    dropStaleResponse orElse
-    {
-    case Event(m: RaftMessage, s: AllData) =>
-      if (m.term > s.currentTerm) {
-        goto(Follower) using handle(Event(m, s.newTerm(m.term)))
-      } else {
-        stay() using handle(Event(m, s))
-      }
-  }
+    dropStaleResponse orElse {
+      case Event(m: RaftMessage, s: AllData) =>
+        if (m.term > s.currentTerm) {
+          goto(Follower) using handle(Event(m, s.newTerm(m.term)))
+        } else {
+          stay() using handle(Event(m, s))
+        }
+    }
 
   def handle(event: Event): AllData = {
     (handleRequestVoteRequest orElse

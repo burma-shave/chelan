@@ -1,8 +1,7 @@
 package ericj.chelan.raft
 
-import ericj.chelan.UnitSpec
 import akka.testkit.{DefaultTimeout, TestKit, TestProbe, TestFSMRef}
-import ericj.chelan.raft.messages.{RequestVoteResponse, RequestVoteRequest, Init}
+import ericj.chelan.raft.messages.RequestVoteRequest
 import akka.actor.FSM.StateTimeout
 import akka.actor.{ActorSystem, ActorRef}
 import org.scalatest._
@@ -52,6 +51,6 @@ OptionValues with Inside with Inspectors with BeforeAndAfter {
       f.raft ! Init(electorate)
       f.raft ! StateTimeout
       f.raft.stateName should be(Candidate)
-      f.raft.stateData.currentTerm should be (f.initialTerm + 1)
+      f.raft.stateData.currentTerm should be(f.initialTerm + 1)
   }
 }

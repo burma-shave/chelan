@@ -20,30 +20,33 @@ trait KvsService extends HttpService {
   import KeyImplicits._
 
   implicit def executionContext = actorRefFactory.dispatcher
+
   private val kvs: ActorRef = actorRefFactory.actorOf(Props[Kvs])
-  implicit val timeout: Timeout  = 1 second
+  implicit val timeout: Timeout = 1 second
 
   val kvsRoute = {
-    path(""".+""".r) { key =>
-      get {
-        complete {
-          ask(kvs, Get(key)).mapTo[Option[String]]
-        }
-      } ~
-        put {
-          entity(as[String]) { value =>
-            complete {
-              kvs ! Put(key, value)
-              key
-            }
+    path( """.+""".r) {
+      key =>
+        get {
+          complete {
+            ask(kvs, Get(key)).mapTo[Option[String]]
           }
         } ~
-        delete {
-          complete {
-            kvs ! Remove(key)
-            "ok"
+          put {
+            entity(as[String]) {
+              value =>
+                complete {
+                  kvs ! Put(key, value)
+                  key
+                }
+            }
+          } ~
+          delete {
+            complete {
+              kvs ! Remove(key)
+              "ok"
+            }
           }
-        }
     }
   }
 

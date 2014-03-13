@@ -2,7 +2,6 @@ package ericj.chelan.raft
 
 import akka.actor.{ActorRef, Props, ActorSystem}
 import ericj.chelan.raft.messages.Init
-import akka.actor.FSM.SubscribeTransitionCallBack
 
 /**
  * Created by Eric Jutrzenka on 05/03/2014.
