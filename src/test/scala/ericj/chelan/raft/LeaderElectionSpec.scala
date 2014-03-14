@@ -1,11 +1,10 @@
 package ericj.chelan.raft
 
 import ericj.chelan.UnitSpec
-import akka.actor.{ActorRef, Props}
+import akka.actor.{ ActorRef, Props }
 import ericj.chelan.raft.messages.Init
 import akka.actor.ActorDSL._
-import akka.actor.FSM.{Transition, SubscribeTransitionCallBack}
-
+import akka.actor.FSM.{ Transition, SubscribeTransitionCallBack }
 
 /**
  * Created by Eric Jutrzenka on 04/03/2014.

@@ -5,7 +5,6 @@ import akka.pattern.ask
 import scala.util.Success
 import ericj.chelan.UnitSpec
 
-
 /**
  * Created by ericj on 13/02/2014.
  */

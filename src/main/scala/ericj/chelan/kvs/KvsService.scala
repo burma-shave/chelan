@@ -2,7 +2,7 @@ package ericj.chelan.kvs
 
 import spray.routing.HttpService
 import akka.pattern.ask
-import akka.actor.{Actor, Props, ActorRef}
+import akka.actor.{ Actor, Props, ActorRef }
 import akka.util.Timeout
 import scala.concurrent.duration._
 
@@ -25,7 +25,7 @@ trait KvsService extends HttpService {
   implicit val timeout: Timeout = 1 second
 
   val kvsRoute = {
-    path( """.+""".r) {
+    path(""".+""".r) {
       key =>
         get {
           complete {

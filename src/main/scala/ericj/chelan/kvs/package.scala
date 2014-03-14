@@ -2,7 +2,6 @@ package ericj.chelan.kvs
 
 import com.roundeights.hasher.Implicits._
 
-
 /**
  * Created by ericj on 13/02/2014.
  */

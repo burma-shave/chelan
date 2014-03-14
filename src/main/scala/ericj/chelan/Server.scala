@@ -1,10 +1,9 @@
 package ericj.chelan
 
-import akka.actor.{ActorSystem, Props}
+import akka.actor.{ ActorSystem, Props }
 import akka.io.IO
 import spray.can.Http
 import ericj.chelan.kvs.KvsServiceActor
-
 
 /**
  * Created by ericj on 13/02/2014.

@@ -14,17 +14,27 @@ import ericj.chelan.raft.messages.RequestVoteRequest
  */
 trait RaftBehaviour extends FSM[State, AllData] {
 
+  /**
+   * Returns a StateFunction that skips stale responses or else
+   * handles the raft message.
+   * @return
+   */
   def raftReceive: StateFunction =
     dropStaleResponse orElse {
       case Event(m: RaftMessage, s: AllData) =>
         if (m.term > s.currentTerm) {
-          goto(Follower) using handle(Event(m, s.newTerm(m.term)))
+          goto(Follower) using handle(Event(m, s withNewTerm m.term))
         } else {
           stay() using handle(Event(m, s))
         }
     }
 
-  def handle(event: Event): AllData = {
+  /**
+   * Performs the state transformation appropriate for the event.
+   * @param event The event
+   * @return The new state
+   */
+  private def handle(event: Event): AllData = {
     (handleRequestVoteRequest orElse
       handleRequestVoteResponse orElse
       handleAppendEntriesRequest orElse
@@ -48,7 +58,7 @@ trait RaftBehaviour extends FSM[State, AllData] {
    */
   def standDown: StateFunction = {
     case Event(m: AppendEntriesRequest, s: AllData) if m.term == s.currentTerm =>
-      goto(Follower) using handle(Event(m, s.newTerm(m.term)))
+      goto(Follower) using handle(Event(m, s withNewTerm m.term))
   }
 
   /**
@@ -58,7 +68,7 @@ trait RaftBehaviour extends FSM[State, AllData] {
   def appendEntries: StateFunction = {
     case Event(HeartBeat, s) =>
       s.electorate foreach {
-        _ ! AppendEntriesRequest(s.currentTerm)
+        m => m.ref ! AppendEntriesRequest(s.currentTerm)
       }
       stay()
   }
@@ -70,7 +80,7 @@ trait RaftBehaviour extends FSM[State, AllData] {
   def requestVote: StateFunction = {
     case Event(HeartBeat, s) =>
       s.electorate foreach {
-        _ ! RequestVoteRequest(s.currentTerm)
+        m => m.ref ! RequestVoteRequest(s.currentTerm)
       }
       stay()
   }
@@ -104,7 +114,7 @@ trait RaftBehaviour extends FSM[State, AllData] {
   def handleRequestVoteResponse: PartialFunction[Event, AllData] = {
     case Event(RequestVoteResponse(term, granted), s) =>
       assert(term == s.currentTerm)
-      s.countBallot(Ballot(sender, granted))
+      s count Ballot(sender, granted)
   }
 
   /**
@@ -114,17 +124,25 @@ trait RaftBehaviour extends FSM[State, AllData] {
    * @return
    */
   def handleAppendEntriesRequest: PartialFunction[Event, AllData] = {
-    case Event(AppendEntriesRequest(term), s) if term < s.currentTerm =>
+    case Event(AppendEntriesRequest(term, prevLogIndex, prevLogTerm, _, _), s) if term < s.currentTerm =>
       sender ! AppendEntriesResponse(s.currentTerm, success = false)
       s
-    case Event(AppendEntriesRequest(term), s) =>
+    case Event(AppendEntriesRequest(term, prevLogIndex, prevLogTerm, entries, leaderCommit), s) =>
       assert(term == s.currentTerm)
-      s
+      if (s.isValid(prevLogIndex, prevLogTerm, s.logVars)) {
+        sender ! AppendEntriesResponse(s.currentTerm, success = true)
+        s appendToLog entries
+      } else {
+        sender ! AppendEntriesResponse(s.currentTerm, success = false)
+        s clearLogFrom prevLogIndex
+      }
+
   }
 
   def handleAppendEntriesResponse: PartialFunction[Event, AllData] = {
-    case Event(AppendEntriesResponse(term, success), s) =>
+    case Event(AppendEntriesResponse(term, success), s) if !success =>
       assert(term == s.currentTerm)
+
       s
   }
 
@@ -134,13 +152,13 @@ trait RaftBehaviour extends FSM[State, AllData] {
    */
   def startNewTerm: StateFunction = {
     case Event(ElectionTimeout, s: AllData) =>
-      val newState: AllData = s.newTerm()
-      s.electorate foreach (_ ! RequestVoteRequest(newState.currentTerm))
+      val newState: AllData = s.newTerm
+      s.electorate foreach (m => m.ref ! RequestVoteRequest(newState.currentTerm))
       goto(Candidate) using newState
     case Event(StateTimeout, s: AllData) =>
       log.debug("Starting new term.")
-      val newState: AllData = s.newTerm()
-      s.electorate foreach (_ ! RequestVoteRequest(newState.currentTerm))
+      val newState: AllData = s.newTerm
+      s.electorate foreach (m => m.ref ! RequestVoteRequest(newState.currentTerm))
       goto(Candidate) using newState
   }
 

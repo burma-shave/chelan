@@ -1,37 +1,17 @@
 package ericj.chelan.raft
 
-import akka.testkit.{DefaultTimeout, TestKit, TestFSMRef, TestProbe}
-import ericj.chelan.raft.messages.{AppendEntriesRequest, RequestVoteResponse, RequestVoteRequest, Init}
+import akka.testkit.{ DefaultTimeout, TestKit, TestFSMRef, TestProbe }
+import ericj.chelan.raft.messages.{ AppendEntriesRequest, RequestVoteResponse, RequestVoteRequest, Init }
 import akka.actor.FSM.StateTimeout
 import akka.actor.ActorSystem
 import org.scalatest._
-
+import CustomMatchers._
 
 /**
+ *
  * Created by Eric Jutrzenka on 13/03/2014.
  */
-class CandidateSpec extends TestKit(ActorSystem("test"))
-with DefaultTimeout with fixture.FlatSpecLike with Matchers with
-OptionValues with Inside with Inspectors with BeforeAndAfter {
-
-  case class FixtureParam(raft: TestFSMRef[State, AllData, RaftActor], probes: Array[TestProbe], initialTerm: Int)
-
-  override protected def withFixture(test: OneArgTest) = {
-    val f = FixtureParam(TestFSMRef(new RaftActor), Array.fill(4)(TestProbe()), 0)
-    f.raft ! Init(f.probes.map {
-      p => p.ref
-    })
-    f.raft ! StateTimeout
-    try {
-      withFixture(test.toNoArgTest(f.copy(initialTerm = f.raft.stateData.currentTerm)))
-    }
-    finally {
-      f.probes.foreach {
-        _ => system.stop(_)
-      }
-      system.stop(f.raft)
-    }
-  }
+class CandidateSpec extends RaftSpec {
 
   "A Candidate" should "send out vote requests when it starts a new term." in {
     f =>
@@ -42,59 +22,65 @@ OptionValues with Inside with Inspectors with BeforeAndAfter {
   }
   it should "start a new term when it times out as a candidate" in {
     f =>
-      f.raft ! StateTimeout
-      f.raft.stateName should be(Candidate)
-      f.raft.stateData.currentTerm should be(f.initialTerm + 1)
+      f.server ! StateTimeout
+      f.server should beInState(Candidate)
+      f.server should beInTerm(f.initialTerm + 1)
       forAll(f.probes) {
         p =>
           p.expectMsgType[RequestVoteRequest]
       }
   }
-  it should "stand down if a RequestVoteRequest with greater term is received" in {
+  it should "stand down on RequestVoteRequest with greater term" in {
     f =>
-      val initialTerm = f.raft.stateData.currentTerm
-      f.raft ! RequestVoteRequest(initialTerm + 1)
-      f.raft.stateName should be(Follower)
+      val initialTerm = f.server.stateData.currentTerm
+      f.server ! RequestVoteRequest(initialTerm + 1)
+      f.server should beInState(Follower)
   }
-  it should "stand down if a AppendEntriesRequest with greater term is received" in {
+  it should "stand down on AppendEntriesRequest with greater term" in {
     f =>
-      val initialTerm = f.raft.stateData.currentTerm
-      f.raft ! AppendEntriesRequest(initialTerm + 1)
-      f.raft.stateName should be(Follower)
+      val initialTerm = f.server.stateData.currentTerm
+      f.server ! AppendEntriesRequest(initialTerm + 2)
+      f.server should beInState(Follower)
+      f.server should beInTerm(initialTerm + 2)
   }
-  it should "stand down if a AppendEntriesRequest with the same term is received" in {
+  it should "stand down on AppendEntriesRequest with the same term" in {
     f =>
-      val initialTerm = f.raft.stateData.currentTerm
-      f.raft ! AppendEntriesRequest(initialTerm)
-      f.raft.stateName should be(Follower)
+      val initialTerm = f.server.stateData.currentTerm
+      f.server ! AppendEntriesRequest(initialTerm)
+      f.server should beInState(Follower)
   }
   it should "be elected leader when it receives enough votes" in {
     f =>
       f.probes(0).expectMsg(RequestVoteRequest(f.initialTerm))
       f.probes(0).reply(RequestVoteResponse(f.initialTerm, granted = true))
-      f.raft.stateName should not be Leader
+      f.server shouldNot beInState(Leader)
       f.probes(1).expectMsg(RequestVoteRequest(f.initialTerm))
       f.probes(1).reply(RequestVoteResponse(f.initialTerm, granted = true))
-      f.raft.stateName should be(Leader)
+      f.server should beInState(Leader)
   }
   it should "ignore votes from the same elector" in {
     f =>
       f.probes(0).expectMsg(RequestVoteRequest(f.initialTerm))
       f.probes(0).reply(RequestVoteResponse(f.initialTerm, granted = true))
-      f.raft.stateName should not be Leader
+      f.server shouldNot beInState(Leader)
       f.probes(0).expectMsg(RequestVoteRequest(f.initialTerm))
       f.probes(0).reply(RequestVoteResponse(f.initialTerm, granted = true))
-      f.raft.stateName should not be Leader
+      f.server.stateName should not be Leader
   }
   it should "not count votes that are not granted" in {
     f =>
       f.probes(0).expectMsg(RequestVoteRequest(f.initialTerm))
       f.probes(0).reply(RequestVoteResponse(f.initialTerm, granted = true))
-      f.raft.stateName should not be Leader
+      f.server shouldNot beInState(Leader)
       f.probes(1).expectMsg(RequestVoteRequest(f.initialTerm))
       f.probes(1).reply(RequestVoteResponse(f.initialTerm, granted = false))
-      f.raft.stateName should not be Leader
+      f.server shouldNot beInState(Leader)
   }
 
+  override def init(f: FixtureParam): FixtureParam = {
+    f.becomeCandidate()
+    f
+  }
 
 }
+

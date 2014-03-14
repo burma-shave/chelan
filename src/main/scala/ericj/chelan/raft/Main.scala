@@ -1,6 +1,6 @@
 package ericj.chelan.raft
 
-import akka.actor.{ActorRef, Props, ActorSystem}
+import akka.actor.{ ActorRef, Props, ActorSystem }
 import ericj.chelan.raft.messages.Init
 
 /**
@@ -23,7 +23,6 @@ object Main {
       ref =>
         ref ! Init(raftActorRefs filter (_ != ref))
     }
-
 
   }
 

@@ -16,7 +16,13 @@ sealed trait RaftRequest extends RaftMessage
 
 sealed trait RaftResponse extends RaftMessage
 
-case class AppendEntriesRequest(term: Int) extends RaftRequest
+case class AppendEntriesRequest(term: Int = 0,
+  prevLogIndex: Int = 0,
+  prevLogTerm: Int = 0,
+  entries: List[NewEntry] = List.empty,
+  leaderCommit: Int = 0) extends RaftRequest
+
+case class NewEntry(term: Int, value: Any)
 
 case class AppendEntriesResponse(term: Int, success: Boolean) extends RaftResponse
 
