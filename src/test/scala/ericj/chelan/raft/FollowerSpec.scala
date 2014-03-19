@@ -45,7 +45,20 @@ class FollowerSpec extends RaftSpec {
         prevLogTerm = 0,
         entries = List.empty,
         leaderCommit = 0))
-      f.probes(0).expectMsg(AppendEntriesResponse(f.initialTerm, success = false))
+      f.probes(0).expectMsg(AppendEntriesResponse(f.initialTerm, None))
+      prevStateData should equal(f.server.stateData)
+  }
+  it should "reject AppendEntriesRequest(s) where term is less than current term" in {
+    f =>
+      f.becomeFollower()
+      val prevStateData = f.server.stateData
+      f.probes(0).send(f.server, AppendEntriesRequest(
+        term = f.initialTerm - 1,
+        prevLogIndex = 7,
+        prevLogTerm = 0,
+        entries = List.empty,
+        leaderCommit = 0))
+      f.probes(0).expectMsg(AppendEntriesResponse(f.initialTerm, None))
       prevStateData should equal(f.server.stateData)
   }
   it should "append entries in a valid AppendEntriesRequest" in {
@@ -59,7 +72,7 @@ class FollowerSpec extends RaftSpec {
         prevLogTerm = 0,
         entries = List(NewEntry(f.initialTerm, expectedLogEntry)),
         leaderCommit = 0))
-      f.probes(0).expectMsg(AppendEntriesResponse(f.initialTerm, success = true))
+      f.probes(0).expectMsg(AppendEntriesResponse(f.initialTerm, Some(1)))
       f.server.stateData.logVars.log should
         equal(LogEntry(f.initialTerm, 1, expectedLogEntry) :: prevStateData.logVars.log)
   }
@@ -98,6 +111,28 @@ class FollowerSpec extends RaftSpec {
           ).reverse)
   }
   it should "commit entries if leaderCommit is ahead" in {
+    f => pending
+  }
+  it should "respond to vote RequestVoteRequest(s) in current term" in {
+    f =>
+      f.becomeFollower()
+      f.probes(0).send(f.server, RequestVoteRequest(
+        term = 0
+      ))
+      f.probes(0).expectMsg(RequestVoteResponse(0, success = true))
+  }
+  it should "vote for only one candidate in the current term" in {
+    f =>
+      f.becomeFollower()
+      f.probes(0).send(f.server, RequestVoteRequest(
+        term = 0
+      ))
+      f.probes(1).send(f.server, RequestVoteRequest(
+        term = 0
+      ))
+      f.probes(1).expectMsg(RequestVoteResponse(0, success = false))
+  }
+  it should "forward ClientRequests to the Leader" in {
     f => pending
   }
 

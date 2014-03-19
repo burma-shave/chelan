@@ -13,7 +13,7 @@ import CustomMatchers._
 abstract class RaftSpec extends TestKit(ActorSystem("test"))
     with DefaultTimeout with fixture.FlatSpecLike with Matchers with OptionValues with Inside with Inspectors with BeforeAndAfter {
 
-  case class FixtureParam(server: TestFSMRef[State, AllData, RaftActor], probes: Array[TestProbe], initialTerm: Int) {
+  case class FixtureParam(server: TestFSMRef[State, RaftState, RaftActor], probes: Array[TestProbe], initialTerm: Int) {
     def becomeFollower(): Unit = {
       server ! Init(probes.map {
         p => p.ref
@@ -26,9 +26,9 @@ abstract class RaftSpec extends TestKit(ActorSystem("test"))
     def becomeLeader(): Unit = {
       becomeCandidate()
       probes(0).expectMsgType[RequestVoteRequest]
-      probes(0).reply(RequestVoteResponse(server.stateData.currentTerm, granted = true))
+      probes(0).reply(RequestVoteResponse(server.stateData.currentTerm, success = true))
       probes(1).expectMsgType[RequestVoteRequest]
-      probes(1).reply(RequestVoteResponse(server.stateData.currentTerm, granted = true))
+      probes(1).reply(RequestVoteResponse(server.stateData.currentTerm, success = true))
     }
   }
 
@@ -54,9 +54,9 @@ import matchers._
 
 trait CustomMatchers {
 
-  class StateShouldBeMatcher(expectedState: Any) extends Matcher[TestFSMRef[State, AllData, RaftActor]] {
+  class StateShouldBeMatcher(expectedState: Any) extends Matcher[TestFSMRef[State, RaftState, RaftActor]] {
 
-    override def apply(left: TestFSMRef[State, AllData, RaftActor]): MatchResult = {
+    override def apply(left: TestFSMRef[State, RaftState, RaftActor]): MatchResult = {
       val stateName = left.stateName
       MatchResult(
         stateName == expectedState,
@@ -67,14 +67,14 @@ trait CustomMatchers {
 
   }
 
-  class ShouldHaveTermMatcher(expectedTerm: Int) extends Matcher[TestFSMRef[State, AllData, RaftActor]] {
+  class ShouldHaveTermMatcher(expectedTerm: Int) extends Matcher[TestFSMRef[State, RaftState, RaftActor]] {
 
-    override def apply(left: TestFSMRef[State, AllData, RaftActor]): MatchResult = {
+    override def apply(left: TestFSMRef[State, RaftState, RaftActor]): MatchResult = {
       val term = left.stateData.currentTerm
       MatchResult(
         term == expectedTerm,
-        s"FSM was in $term rather than $expectedTerm",
-        s"FSM was in $expectedTerm"
+        s"FSM was in term $term rather than $expectedTerm",
+        s"FSM was in term $expectedTerm"
       )
     }
 

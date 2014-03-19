@@ -30,6 +30,9 @@ class CandidateSpec extends RaftSpec {
           p.expectMsgType[RequestVoteRequest]
       }
   }
+  it should "not repeat a RequestVoteReques when a vote has been counted" in {
+    f => pending
+  }
   it should "stand down on RequestVoteRequest with greater term" in {
     f =>
       val initialTerm = f.server.stateData.currentTerm
@@ -52,29 +55,32 @@ class CandidateSpec extends RaftSpec {
   it should "be elected leader when it receives enough votes" in {
     f =>
       f.probes(0).expectMsg(RequestVoteRequest(f.initialTerm))
-      f.probes(0).reply(RequestVoteResponse(f.initialTerm, granted = true))
+      f.probes(0).reply(RequestVoteResponse(f.initialTerm, success = true))
       f.server shouldNot beInState(Leader)
       f.probes(1).expectMsg(RequestVoteRequest(f.initialTerm))
-      f.probes(1).reply(RequestVoteResponse(f.initialTerm, granted = true))
+      f.probes(1).reply(RequestVoteResponse(f.initialTerm, success = true))
       f.server should beInState(Leader)
   }
   it should "ignore votes from the same elector" in {
     f =>
       f.probes(0).expectMsg(RequestVoteRequest(f.initialTerm))
-      f.probes(0).reply(RequestVoteResponse(f.initialTerm, granted = true))
+      f.probes(0).reply(RequestVoteResponse(f.initialTerm, success = true))
       f.server shouldNot beInState(Leader)
       f.probes(0).expectMsg(RequestVoteRequest(f.initialTerm))
-      f.probes(0).reply(RequestVoteResponse(f.initialTerm, granted = true))
+      f.probes(0).reply(RequestVoteResponse(f.initialTerm, success = true))
       f.server.stateName should not be Leader
   }
   it should "not count votes that are not granted" in {
     f =>
       f.probes(0).expectMsg(RequestVoteRequest(f.initialTerm))
-      f.probes(0).reply(RequestVoteResponse(f.initialTerm, granted = true))
+      f.probes(0).reply(RequestVoteResponse(f.initialTerm, success = true))
       f.server shouldNot beInState(Leader)
       f.probes(1).expectMsg(RequestVoteRequest(f.initialTerm))
-      f.probes(1).reply(RequestVoteResponse(f.initialTerm, granted = false))
+      f.probes(1).reply(RequestVoteResponse(f.initialTerm, success = false))
       f.server shouldNot beInState(Leader)
+  }
+  it should "queue client requests until a leader is elected" in {
+    f => pending
   }
 
   override def init(f: FixtureParam): FixtureParam = {

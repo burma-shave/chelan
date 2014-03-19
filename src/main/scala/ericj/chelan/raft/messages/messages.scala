@@ -14,7 +14,13 @@ sealed trait RaftMessage {
 
 sealed trait RaftRequest extends RaftMessage
 
-sealed trait RaftResponse extends RaftMessage
+sealed trait RaftResponse extends RaftMessage {
+  val success: Boolean
+}
+
+case class ClientRequest(payload: Any)
+
+object ClientResponse
 
 case class AppendEntriesRequest(term: Int = 0,
   prevLogIndex: Int = 0,
@@ -24,9 +30,11 @@ case class AppendEntriesRequest(term: Int = 0,
 
 case class NewEntry(term: Int, value: Any)
 
-case class AppendEntriesResponse(term: Int, success: Boolean) extends RaftResponse
+case class AppendEntriesResponse(term: Int, lastAgreeIndex: Option[Int] = None) extends RaftResponse {
+  override val success: Boolean = lastAgreeIndex != None
+}
 
 case class RequestVoteRequest(term: Int) extends RaftRequest
 
-case class RequestVoteResponse(term: Int, granted: Boolean) extends RaftResponse
+case class RequestVoteResponse(term: Int, success: Boolean) extends RaftResponse
 
