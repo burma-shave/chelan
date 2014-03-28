@@ -29,11 +29,11 @@ class LeaderElectionSpec extends UnitSpec {
         ref ! Init(raftActorRefs filter (_ != ref))
     }
 
-    fishForMessage() {
-      case Transition(_, Candidate, Leader) =>
-        true
-      case _ => false
-    }
+    //    fishForMessage() {
+    //      case Transition(_, Candidate, Leader) =>
+    //        true
+    //      case _ => false
+    //    }
 
     raftActorRefs foreach {
       ref =>

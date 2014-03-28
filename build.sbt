@@ -10,7 +10,7 @@ resolvers += "RoundEights" at "http://maven.spikemark.net/roundeights"
 
 resolvers += "spray repo" at "http://repo.spray.io"
 
-val akkaVersion = "2.3.0"
+val akkaVersion = "2.3.1"
 
 val sprayVersion = "1.2.0"
 
@@ -29,5 +29,8 @@ libraryDependencies += "io.spray" % "spray-routing" % sprayVersion
 libraryDependencies += "io.spray" % "spray-can" % sprayVersion
 
 libraryDependencies += "io.spray" % "spray-testkit" % sprayVersion % "test"
+
+libraryDependencies += "org.scalamock" %% "scalamock-scalatest-support" % "3.0.1" % "test"
+
 
 scalariformSettings
