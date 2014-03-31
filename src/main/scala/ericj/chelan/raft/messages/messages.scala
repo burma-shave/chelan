@@ -6,8 +6,6 @@ case class Init(cluster: Array[ActorRef])
 
 object HeartBeat
 
-object ElectionTimeout
-
 sealed trait RaftMessage {
   val term: Int
 }
@@ -34,7 +32,7 @@ case class AppendEntriesResponse(term: Int, lastAgreeIndex: Option[Int] = None) 
   override val success: Boolean = lastAgreeIndex != None
 }
 
-case class RequestVoteRequest(term: Int) extends RaftRequest
+case class RequestVoteRequest(term: Int, lastLogIndex: Int = 0, lastLogTerm: Int = 0) extends RaftRequest
 
 case class RequestVoteResponse(term: Int, success: Boolean) extends RaftResponse
 

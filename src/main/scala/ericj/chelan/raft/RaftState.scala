@@ -73,7 +73,8 @@ case class RaftState(replicaVars: ReplicaVars = ReplicaVars(0, None),
     })
 
     val newCommitIndx: Option[Int] = newState.electorate.toList.groupBy(m => m.lastAgreeIndex) collectFirst {
-      case (lastAgreeIndex, members) if members.length + 1 > (electorate.length + 1) / 2 =>
+      case (lastAgreeIndex, members) if members.length + 1 > (electorate.length + 1) / 2 &&
+        newState.termOfLogEntryAtIndex(lastAgreeIndex) == newState.currentTerm =>
         lastAgreeIndex
     }
 

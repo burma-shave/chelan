@@ -11,28 +11,6 @@ import ericj.chelan.raft.messages.NewEntry
  */
 class RaftStateSpec extends TestKit(ActorSystem("test")) with FreeSpecLike with Matchers {
 
-  "foo" - {
-    var foo: Int = 0
-
-    def fooBar() {
-      println(foo)
-      foo = foo + 1
-    }
-
-    def fee(): PartialFunction[Any, Unit] = {
-      var upd: Int = 0
-      println("init fee");
-      {
-        case m => println(m + " " + upd); upd = upd + 1
-      }
-    }
-
-    val bgfd = fee()
-
-    bgfd("fdds")
-    bgfd("fdds")
-  }
-
   "A RaftState" - {
     "when uninitialised" - {
       "should have a single log entry" in {
@@ -241,6 +219,23 @@ class RaftStateSpec extends TestKit(ActorSystem("test")) with FreeSpecLike with 
 
           state.logVars.commitIndex should be(0)
         }
+        "should leave commitIndex = 0 when AppendAccepted(_, 2) for entries not in current term" in {
+          val probe1 = TestProbe().ref
+          val probe2 = TestProbe().ref
+          val probe3 = TestProbe().ref
+          val probe4 = TestProbe().ref
+          val probe5 = TestProbe().ref
+
+          val state = RaftState() x
+            Initialised(Array(probe1, probe2, probe3, probe4, probe5)) x
+            NewTerm(5) x
+            Elected x
+            AppendedToLog(entries) x
+            AppendAccepted(probe2, 2) x
+            AppendAccepted(probe1, 2)
+
+          state.logVars.commitIndex should be(0)
+        }
         "should update commitIndex = 2 when AppendAccepted(_, 2) for the majority of members" in {
           val probe1 = TestProbe().ref
           val probe2 = TestProbe().ref
@@ -251,6 +246,7 @@ class RaftStateSpec extends TestKit(ActorSystem("test")) with FreeSpecLike with 
             Initialised(Array(probe1, probe2, probe3, probe4)) x
             Elected x
             AppendedToLog(entries) x
+            TermIncremented x
             AppendAccepted(probe2, 2) x
             AppendAccepted(probe1, 2)
 

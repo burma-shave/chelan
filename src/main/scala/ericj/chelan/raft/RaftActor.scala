@@ -10,6 +10,10 @@ import akka.actor.{ Actor, ReceiveTimeout, Cancellable, Props }
 import scala.concurrent.duration._
 import scala.util.Random
 
+sealed trait ElectionEvent
+
+case object StoodDown
+
 /**
  *
  * Created by Eric Jutrzenka on 20/03/2014.
@@ -24,7 +28,7 @@ class RaftActor(val id: String = "my-stable-processor-id") extends EventsourcedP
 
   var sate: State = NotStarted
 
-  var hearBeat: Cancellable = new Cancellable {
+  var heartBeat: Cancellable = new Cancellable {
     override def cancel(): Boolean = false
     override def isCancelled: Boolean = true
   }
@@ -44,15 +48,25 @@ class RaftActor(val id: String = "my-stable-processor-id") extends EventsourcedP
         case (_, _) => ()
       }
     } else ()
+    sate = newState
   }
 
-  def cancelHeartBeat() {
-    hearBeat.cancel()
+  private def cancelHeartBeat() {
+    heartBeat.cancel()
   }
 
-  def startHeartBeat() {
-    hearBeat.cancel()
-    hearBeat = system.scheduler.schedule(0 millis, 100 millis, self, HeartBeat)
+  private def startHeartBeat() {
+    heartBeat.cancel()
+    heartBeat = system.scheduler.schedule(0 millis, 100 millis, self, HeartBeat)
+  }
+
+  private def updateTerm: Receive = {
+    case m: RaftRequest if m.term > stateData.currentTerm =>
+      persist(NewTerm(m.term)) {
+        evt =>
+          updateState(evt)
+          self forward m
+      }
   }
 
   sealed trait State {
@@ -71,11 +85,11 @@ class RaftActor(val id: String = "my-stable-processor-id") extends EventsourcedP
   }
 
   case object Follower extends State {
-    val behaviour = startNewTerm orElse followerBheaviour
+    val behaviour = updateTerm orElse handleElectionTimeout orElse followerBheaviour
   }
 
   case object Candidate extends State {
-    val behaviour: Receive = startNewTerm orElse candidateBheaviour
+    val behaviour: Receive = handleElectionTimeout orElse candidateBheaviour
 
   }
 
@@ -90,7 +104,7 @@ class RaftActor(val id: String = "my-stable-processor-id") extends EventsourcedP
     }
   }
 
-  def startNewTerm: Receive = {
+  private def handleElectionTimeout: Receive = {
     case ReceiveTimeout =>
       persist(TermIncremented) {
         evt =>
@@ -106,7 +120,7 @@ class RaftActor(val id: String = "my-stable-processor-id") extends EventsourcedP
       goto(Follower)
   }
 
-  def handleStaleRequest: Receive = {
+  private def handleStaleRequest: Receive = {
     case m: AppendEntriesRequest if m.term < stateData.currentTerm =>
       sender ! AppendEntriesResponse(stateData.currentTerm, None)
     case m: RequestVoteRequest if m.term < stateData.currentTerm =>
@@ -158,8 +172,7 @@ trait LeaderBehaviour {
 trait CandidateBheaviour {
   this: RaftActor =>
   val candidateBheaviour: Receive = {
-    startNewTerm orElse
-      handleClientRequest orElse
+    handleClientRequest orElse
       handleRequestVoteResponse orElse
       standDownIfMessageTerm(_ >= stateData.currentTerm)
   }
@@ -169,17 +182,11 @@ trait CandidateBheaviour {
       self forward m
   }
 
-  //  private def requestVote: Receive = {
-  //    case HeartBeat =>
-  //      stateData.electorate foreach {
-  //        m => m.ref ! RequestVoteRequest(stateData.currentTerm)
-  //      }
-  //  }
-
   private def handleRequestVoteResponse: Receive = {
     case RequestVoteResponse(term, granted) if term == stateData.currentTerm =>
       updateState(BallotCounted(sender(), granted))
       if (stateData.enoughVotes) {
+        updateState(Elected)
         goto(Leader)
       } else ()
   }
@@ -188,11 +195,9 @@ trait CandidateBheaviour {
 trait FollowerBehaviour {
   this: RaftActor =>
   val followerBheaviour: Receive =
-    updateTerm orElse
-      handleRequestVoteRequest orElse
+    handleRequestVoteRequest orElse
       handleAppendEntriesRequest orElse
-      forwardClientRequest orElse
-      startNewTerm
+      forwardClientRequest
 
   private def handleAppendEntriesRequest: Receive = {
     case AppendEntriesRequest(term, prevLogIndex, prevLogTerm, entries, leaderCommit) =>
@@ -237,9 +242,11 @@ trait FollowerBehaviour {
    * @return stay in the current state and set votedFor.
    */
   private def handleRequestVoteRequest: Receive = {
-    case RequestVoteRequest(term) =>
+    case RequestVoteRequest(term, lastLogIndex, lastLogTerm) =>
       assert(term == stateData.currentTerm)
-      if (stateData.voted) {
+      if (stateData.voted ||
+        lastLogTerm < stateData.logVars.log.head.term ||
+        (lastLogTerm == stateData.logVars.log.head.term && lastLogIndex < stateData.logVars.log.head.index)) {
         sender ! RequestVoteResponse(stateData.currentTerm, success = false)
       } else {
         persist(VotedFor(sender())) {
@@ -250,17 +257,9 @@ trait FollowerBehaviour {
       }
   }
 
-  private def updateTerm: Receive = {
-    case m: RaftRequest if m.term > stateData.currentTerm =>
-      persist(NewTerm(m.term)) {
-        evt =>
-          updateState(evt)
-          self forward m
-      }
-  }
-
   private def forwardClientRequest: Receive = {
     case m: ClientRequest =>
       stateData.leader.get forward m
   }
 }
+
